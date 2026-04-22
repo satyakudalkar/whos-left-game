@@ -2,6 +2,7 @@ const GAME_MODES = {
   bollywood: {
     id: "bollywood",
     label: "Bollywood Celebrities",
+    boardSize: 25,
     extensions: [".jpg", ".jpeg", ".png"],
     characters: [
       { id: "shah_rukh_khan", name: "Shah Rukh Khan", accent: ["#4568dc", "#b06ab3"] },
@@ -29,6 +30,7 @@ const GAME_MODES = {
   clashofclans: {
     id: "clashofclans",
     label: "Clash of Clans",
+    boardSize: 25,
     extensions: [".webp", ".png"],
     characters: [
       { id: "barbarian", name: "Barbarian", accent: ["#d4881f", "#f5a623"] },
@@ -87,7 +89,7 @@ function getModeById(modeId) {
 
 function getCharacterCountForMode(modeId) {
   const mode = getModeById(modeId);
-  return mode ? mode.characters.length : 0;
+  return mode ? (mode.boardSize || 25) : 0;
 }
 
 function populateModeSelect(selectId) {
