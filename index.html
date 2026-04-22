@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Who's Left?</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="hero">
+      <div class="title-wrap">
+        <h1>Who's Left?</h1>
+        <p>
+          A 2-player peer-to-peer companion board for Discord calls. You track your Bollywood grid,
+          the other player sees only masked card positions flipping on their mini-board, and both sides
+          stay synced over WebRTC with manual copy/paste signaling.
+        </p>
+      </div>
+      <div id="connectionPill" class="connection-pill" data-status="idle">Not connected</div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar panel">
+        <section class="panel-section">
+          <h2>Connection</h2>
+          <label for="modeSelect">Board Mode</label>
+          <select id="modeSelect">
+            <option value="bollywood">Bollywood Celebrities</option>
+          </select>
+          <span class="tiny-note">Mode support is data-driven. The MVP ships with Bollywood only.</span>
+        </section>
+
+        <section class="panel-section">
+          <h3>Manual Signaling</h3>
+          <div class="button-row two">
+            <button id="createOfferBtn" class="primary-btn">Create Offer</button>
+            <button id="copySignalBtn" class="secondary-btn">Copy My Signal</button>
+          </div>
+          <label for="localSignalOutput" class="spaced-label">Your Signal</label>
+          <textarea id="localSignalOutput" readonly placeholder="Your offer or answer appears here after ICE gathering completes."></textarea>
+
+          <label for="remoteSignalInput" class="spaced-label">Remote Signal</label>
+          <textarea id="remoteSignalInput" placeholder="Paste the other player's offer or answer here."></textarea>
+
+          <div class="button-row two top-gap">
+            <button id="createAnswerBtn" class="primary-btn">Create Answer</button>
+            <button id="acceptAnswerBtn" class="secondary-btn">Accept Answer</button>
+          </div>
+
+          <p class="status-text" id="statusText">Create an offer or paste a remote offer to begin.</p>
+          <ol class="steps">
+            <li>Host clicks <span class="kbd">Create Offer</span> and sends the generated text.</li>
+            <li>Joiner pastes it, clicks <span class="kbd">Create Answer</span>, then sends back the answer.</li>
+            <li>Host pastes that answer and clicks <span class="kbd">Accept Answer</span>.</li>
+          </ol>
+        </section>
+
+        <section class="panel-section">
+          <h3>Round Status</h3>
+          <div class="score-grid">
+            <div class="score-card">
+              <div class="label">Your remaining</div>
+              <div class="value" id="yourRemainingCount">20</div>
+            </div>
+            <div class="score-card" id="opponentScoreCard">
+              <div class="label">Opponent remaining</div>
+              <div class="value" id="opponentRemainingCount">20</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <h3>Actions</h3>
+          <div class="action-row three">
+            <button id="undoBtn" class="secondary-btn">Undo</button>
+            <button id="resyncBtn" class="secondary-btn">Resync</button>
+            <button id="resetBtn" class="danger-btn">Reset</button>
+          </div>
+          <span class="tiny-note">
+            Reset starts a fresh round with a newly shuffled board on both sides. Secret picks stay local and are never shared.
+          </span>
+        </section>
+      </aside>
+
+      <section class="board-column">
+        <section class="board-panel panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Your Board</h2>
+              <p>Click a card to eliminate or restore it. Use the secret button to mark your choice locally.</p>
+            </div>
+            <p id="boardInfo">Waiting for a round to start.</p>
+          </div>
+          <div id="yourBoardContainer"></div>
+        </section>
+
+        <section class="board-panel panel">
+          <div class="panel-heading">
+            <div>
+              <h3>Opponent Mini-Board</h3>
+              <p>You can see every position, but only as masked cards. Eliminated ones flip to card backs.</p>
+            </div>
+          </div>
+          <div id="opponentBoardContainer"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
