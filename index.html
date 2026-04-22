@@ -23,37 +23,51 @@
     <main class="layout">
       <aside class="sidebar panel">
         <section class="panel-section">
-          <h2>Connection</h2>
+          <h3>Game Mode</h3>
           <label for="modeSelect">Board Mode</label>
           <select id="modeSelect">
             <option value="bollywood">Bollywood Celebrities</option>
           </select>
-          <span class="tiny-note">Mode support is data-driven. The MVP ships with Bollywood only.</span>
+          <span class="tiny-note">More modes can be added later.</span>
         </section>
 
-        <section class="panel-section">
-          <h3>Manual Signaling</h3>
-          <div class="button-row two">
-            <button id="createOfferBtn" class="primary-btn">Create Offer</button>
-            <button id="copySignalBtn" class="secondary-btn">Copy My Signal</button>
+        <section class="panel-section collapsible" id="connectionPanel">
+          <button type="button" class="collapsible-header" aria-expanded="true" id="connectionPanelToggle">
+            <h2>Connection</h2>
+            <span class="chevron"></span>
+          </button>
+          <div class="collapsible-content">
+            <h3>Manual Signaling</h3>
+            <div class="button-row two">
+              <button id="createOfferBtn" class="primary-btn">Create Offer</button>
+              <button id="pasteRemoteBtn" class="secondary-btn">Paste</button>
+            </div>
+            <label for="localSignalOutput" class="spaced-label">Your Signal</label>
+            <textarea id="localSignalOutput" readonly placeholder="Your offer or answer appears here after ICE gathering completes."></textarea>
+            <div class="signal-actions">
+              <button id="copySignalBtn" class="tiny-btn">Copy</button>
+              <button id="whatsappSignalBtn" class="tiny-btn">Send to WhatsApp</button>
+            </div>
+
+            <label for="remoteSignalInput" class="spaced-label">Remote Signal</label>
+            <textarea id="remoteSignalInput" placeholder="Paste the other player's offer or answer here."></textarea>
+            <div class="signal-actions">
+              <button id="pasteRemoteBtn" class="tiny-btn">Paste</button>
+              <button id="whatsappRemoteBtn" class="tiny-btn">Send to WhatsApp</button>
+            </div>
+
+            <div class="button-row two top-gap">
+              <button id="createAnswerBtn" class="primary-btn">Create Answer</button>
+              <button id="acceptAnswerBtn" class="secondary-btn">Accept Answer</button>
+            </div>
+
+            <p class="status-text" id="statusText">Create an offer or paste a remote offer to begin.</p>
+            <ol class="steps">
+              <li>Host clicks <span class="kbd">Create Offer</span> and sends the generated text.</li>
+              <li>Joiner pastes it, clicks <span class="kbd">Create Answer</span>, then sends back the answer.</li>
+              <li>Host pastes that answer and clicks <span class="kbd">Accept Answer</span>.</li>
+            </ol>
           </div>
-          <label for="localSignalOutput" class="spaced-label">Your Signal</label>
-          <textarea id="localSignalOutput" readonly placeholder="Your offer or answer appears here after ICE gathering completes."></textarea>
-
-          <label for="remoteSignalInput" class="spaced-label">Remote Signal</label>
-          <textarea id="remoteSignalInput" placeholder="Paste the other player's offer or answer here."></textarea>
-
-          <div class="button-row two top-gap">
-            <button id="createAnswerBtn" class="primary-btn">Create Answer</button>
-            <button id="acceptAnswerBtn" class="secondary-btn">Accept Answer</button>
-          </div>
-
-          <p class="status-text" id="statusText">Create an offer or paste a remote offer to begin.</p>
-          <ol class="steps">
-            <li>Host clicks <span class="kbd">Create Offer</span> and sends the generated text.</li>
-            <li>Joiner pastes it, clicks <span class="kbd">Create Answer</span>, then sends back the answer.</li>
-            <li>Host pastes that answer and clicks <span class="kbd">Accept Answer</span>.</li>
-          </ol>
         </section>
 
         <section class="panel-section">
@@ -67,18 +81,31 @@
               <div class="label">Opponent remaining</div>
               <div class="value" id="opponentRemainingCount">20</div>
             </div>
+            <div class="score-card turn-card" id="turnStatusCard">
+              <div class="label">Turn</div>
+              <div class="value turn-value" id="turnStatusValue">Waiting</div>
+            </div>
           </div>
         </section>
 
         <section class="panel-section">
+          <h3>Your Secret</h3>
+          <div id="secretPanelContainer"></div>
+          <span class="tiny-note">
+            The first two turns are reserved for secret selection. Once both secrets are locked in, the normal question and answer flow begins.
+          </span>
+        </section>
+
+        <section class="panel-section">
           <h3>Actions</h3>
-          <div class="action-row three">
+          <div class="action-row four">
             <button id="undoBtn" class="secondary-btn">Undo</button>
             <button id="resyncBtn" class="secondary-btn">Resync</button>
+            <button id="passControlBtn" class="secondary-btn">Pass Turn</button>
             <button id="resetBtn" class="danger-btn">Reset</button>
           </div>
           <span class="tiny-note">
-            Reset starts a fresh round with a newly shuffled board on both sides. Secret picks stay local and are never shared.
+            In setup, each player gets one private turn to choose a secret. After that, only the current questioner can pass control. When you are answering, your full board is hidden and you only keep your private secret plus the opponent mini-board. A correct guess locks both boards until reset.
           </span>
         </section>
       </aside>
@@ -88,7 +115,7 @@
           <div class="panel-heading">
             <div>
               <h2>Your Board</h2>
-              <p>Click a card to eliminate or restore it. Use the secret button to mark your choice locally.</p>
+              <p>The first two turns are for picking secrets. After setup, only the current questioner sees the full board. The answering player keeps only the secret panel and the opponent mini-board. Use Guess to make a direct call on the opponent's secret.</p>
             </div>
             <p id="boardInfo">Waiting for a round to start.</p>
           </div>
@@ -108,6 +135,19 @@
     </main>
   </div>
 
+  <div id="roundResultOverlay" class="round-result-overlay" hidden>
+    <div id="roundResultCard" class="round-result-card">
+      <div id="roundResultEmoji" class="round-result-emoji"></div>
+      <h2 id="roundResultTitle" class="round-result-title"></h2>
+      <p id="roundResultBody" class="round-result-body"></p>
+      <button id="newGameBtn" class="primary-btn new-game-btn" hidden>New Game</button>
+      <div id="confettiField" class="confetti-field" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <script src="./modes.js"></script>
+  <script src="./utils.js"></script>
+  <script src="./constants.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

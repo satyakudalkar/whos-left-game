@@ -1,61 +1,3 @@
-const GAME_MODES = {
-  bollywood: {
-    id: "bollywood",
-    label: "Bollywood Celebrities",
-    characters: [
-      { id: "srk", name: "Shah Rukh Khan", accent: ["#4568dc", "#b06ab3"] },
-      { id: "salman", name: "Salman Khan", accent: ["#11998e", "#38ef7d"] },
-      { id: "aamir", name: "Aamir Khan", accent: ["#1d2b64", "#f8cdda"] },
-      { id: "hrithik", name: "Hrithik Roshan", accent: ["#4b6cb7", "#182848"] },
-      { id: "ranbir", name: "Ranbir Kapoor", accent: ["#c33764", "#1d2671"] },
-      { id: "ranveer", name: "Ranveer Singh", accent: ["#f46b45", "#eea849"] },
-      { id: "ajay", name: "Ajay Devgn", accent: ["#134e5e", "#71b280"] },
-      { id: "akshay", name: "Akshay Kumar", accent: ["#3a1c71", "#d76d77"] },
-      { id: "amitabh", name: "Amitabh Bachchan", accent: ["#42275a", "#734b6d"] },
-      { id: "saif", name: "Saif Ali Khan", accent: ["#0f2027", "#2c5364"] },
-      { id: "deepika", name: "Deepika Padukone", accent: ["#355c7d", "#6c5b7b"] },
-      { id: "priyanka", name: "Priyanka Chopra", accent: ["#614385", "#516395"] },
-      { id: "alia", name: "Alia Bhatt", accent: ["#ff758c", "#ff7eb3"] },
-      { id: "kareena", name: "Kareena Kapoor", accent: ["#cc2b5e", "#753a88"] },
-      { id: "katrina", name: "Katrina Kaif", accent: ["#7f00ff", "#e100ff"] },
-      { id: "anushka", name: "Anushka Sharma", accent: ["#11998e", "#0575e6"] },
-      { id: "madhuri", name: "Madhuri Dixit", accent: ["#ff512f", "#dd2476"] },
-      { id: "kajol", name: "Kajol", accent: ["#8360c3", "#2ebf91"] },
-      { id: "vidya", name: "Vidya Balan", accent: ["#41295a", "#2f0743"] },
-      { id: "kiara", name: "Kiara Advani", accent: ["#4776e6", "#8e54e9"] }
-    ]
-  }
-};
-
-const MESSAGE_TYPES = {
-  MODE_INIT: "mode_init",
-  TILE_TOGGLE: "tile_toggle",
-  COUNT_UPDATE: "count_update",
-  SYNC: "sync",
-  RESET: "reset"
-};
-
-const dom = {
-  modeSelect: document.getElementById("modeSelect"),
-  createOfferBtn: document.getElementById("createOfferBtn"),
-  copySignalBtn: document.getElementById("copySignalBtn"),
-  createAnswerBtn: document.getElementById("createAnswerBtn"),
-  acceptAnswerBtn: document.getElementById("acceptAnswerBtn"),
-  undoBtn: document.getElementById("undoBtn"),
-  resyncBtn: document.getElementById("resyncBtn"),
-  resetBtn: document.getElementById("resetBtn"),
-  localSignalOutput: document.getElementById("localSignalOutput"),
-  remoteSignalInput: document.getElementById("remoteSignalInput"),
-  statusText: document.getElementById("statusText"),
-  connectionPill: document.getElementById("connectionPill"),
-  yourRemainingCount: document.getElementById("yourRemainingCount"),
-  opponentRemainingCount: document.getElementById("opponentRemainingCount"),
-  opponentScoreCard: document.getElementById("opponentScoreCard"),
-  yourBoardContainer: document.getElementById("yourBoardContainer"),
-  opponentBoardContainer: document.getElementById("opponentBoardContainer"),
-  boardInfo: document.getElementById("boardInfo")
-};
-
 const state = {
   modeId: "bollywood",
   shuffleSeed: null,
@@ -64,71 +6,24 @@ const state = {
   opponentEliminated: new Set(),
   history: [],
   secretIndex: null,
-  yourRemaining: GAME_MODES.bollywood.characters.length,
-  opponentRemaining: GAME_MODES.bollywood.characters.length,
+  yourRemaining: 0,
+  opponentRemaining: 0,
   connectionStatus: "idle",
   peerConnection: null,
   dataChannel: null,
   isHost: false,
   opponentCountFlashTimer: null,
-  statusMessage: "Create an offer or paste a remote offer to begin."
+  statusMessage: "Create an offer or paste a remote offer to begin.",
+  roundLocked: false,
+  roundResult: null,
+  turnPhase: "setup",
+  turnOwner: "host"
 };
 
-function createSeed() {
-  const bytes = new Uint32Array(2);
-  window.crypto.getRandomValues(bytes);
-  return Array.from(bytes, (value) => value.toString(36)).join("-");
-}
+const CONFETTI_COLORS = ["#7c9cff", "#8d7dff", "#30d09b", "#ffcc66", "#ff7183", "#ffffff"];
 
-function hashSeed(seed) {
-  let hash = 2166136261;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash ^= seed.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
-function createRng(seed) {
-  let value = hashSeed(seed) || 1;
-  return function random() {
-    value += 0x6d2b79f5;
-    let t = value;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function seededShuffle(items, seed) {
-  const copy = items.slice();
-  const random = createRng(seed);
-  for (let index = copy.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(random() * (index + 1));
-    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
-  }
-  return copy;
-}
-
-function getInitials(name) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
-}
-
-function safeJsonParse(text) {
-  try {
-    return { ok: true, value: JSON.parse(text) };
-  } catch (error) {
-    return { ok: false, error };
-  }
-}
-
-function setStatus(message, type = "info") {
+function setStatus(message, type) {
+  type = type || "info";
   state.statusMessage = message;
   dom.statusText.textContent = message;
   dom.statusText.style.color = type === "error" ? "#ffd4db" : "";
@@ -140,16 +35,38 @@ function updateConnectionStatus(status, label) {
   dom.connectionPill.textContent = label;
 }
 
-function getCurrentMode() {
-  return GAME_MODES[state.modeId];
+function collapseConnectionPanel() {
+  dom.connectionPanel.setAttribute("collapsed", "");
+  dom.connectionPanelToggle.setAttribute("aria-expanded", "false");
 }
 
-function getCharacterCount() {
-  return getCurrentMode().characters.length;
+function expandConnectionPanel() {
+  dom.connectionPanel.removeAttribute("collapsed");
+  dom.connectionPanelToggle.setAttribute("aria-expanded", "true");
 }
 
-function getLocalPhotoPath(character) {
-  return `./assets/photos/${character.id}.jpg`;
+function toggleConnectionPanel() {
+  if (dom.connectionPanel.hasAttribute("collapsed")) {
+    expandConnectionPanel();
+  } else {
+    collapseConnectionPanel();
+  }
+}
+
+function getTurnRole() {
+  const isCurrentOwner = state.isHost === (state.turnOwner === "host");
+  if (state.turnPhase === "setup") {
+    return isCurrentOwner ? "pick" : "wait";
+  }
+  return isCurrentOwner ? "question" : "answer";
+}
+
+function areBoardActionsEnabled() {
+  return !state.roundLocked && state.turnPhase === "play" && getTurnRole() === "question";
+}
+
+function canChooseSecret() {
+  return !state.roundLocked && state.turnPhase === "setup" && getTurnRole() === "pick";
 }
 
 function resetLocalStateForBoard() {
@@ -157,12 +74,64 @@ function resetLocalStateForBoard() {
   state.opponentEliminated = new Set();
   state.history = [];
   state.secretIndex = null;
-  state.yourRemaining = getCharacterCount();
-  state.opponentRemaining = getCharacterCount();
+  state.yourRemaining = getCharacterCountForMode(state.modeId);
+  state.opponentRemaining = getCharacterCountForMode(state.modeId);
+  state.roundLocked = false;
+  state.roundResult = null;
+  state.turnPhase = "setup";
+  state.turnOwner = "host";
+}
+
+function clearConfetti() {
+  dom.confettiField.innerHTML = "";
+}
+
+function launchConfetti() {
+  clearConfetti();
+  for (let index = 0; index < 28; index += 1) {
+    const piece = document.createElement("span");
+    piece.className = "confetti-piece";
+    piece.style.left = (Math.random() * 100) + "%";
+    piece.style.background = CONFETTI_COLORS[index % CONFETTI_COLORS.length];
+    piece.style.animationDuration = (3 + Math.random() * 1.4) + "s";
+    piece.style.animationDelay = (Math.random() * 0.35) + "s";
+    piece.style.setProperty("--drift", ((Math.random() - 0.5) * 180) + "px");
+    dom.confettiField.appendChild(piece);
+  }
+}
+
+function renderRoundResultOverlay() {
+  if (state.roundResult !== "win" && state.roundResult !== "lose") {
+    dom.roundResultOverlay.hidden = true;
+    dom.roundResultCard.dataset.result = "";
+    dom.roundResultEmoji.textContent = "";
+    dom.roundResultTitle.textContent = "";
+    dom.roundResultBody.textContent = "";
+    clearConfetti();
+    return;
+  }
+
+  dom.roundResultOverlay.hidden = false;
+  dom.roundResultCard.dataset.result = state.roundResult;
+
+  if (state.roundResult === "win") {
+    dom.roundResultEmoji.textContent = "🎉";
+    dom.roundResultTitle.textContent = "You Win";
+    dom.roundResultBody.textContent = "Your guess was correct. The round is locked until someone presses Reset.";
+    dom.newGameBtn.hidden = !state.isHost;
+    launchConfetti();
+    return;
+  }
+
+  dom.roundResultEmoji.textContent = "😵";
+  dom.roundResultTitle.textContent = "You Lose";
+  dom.roundResultBody.textContent = "Your secret was guessed correctly. The round is locked until someone presses Reset.";
+  dom.newGameBtn.hidden = !state.isHost;
+  clearConfetti();
 }
 
 function initializeBoard(modeId, seed) {
-  const mode = GAME_MODES[modeId];
+  const mode = getModeById(modeId);
   if (!mode) {
     throw new Error("Unknown mode selected.");
   }
@@ -170,11 +139,18 @@ function initializeBoard(modeId, seed) {
   state.modeId = modeId;
   dom.modeSelect.value = modeId;
   state.shuffleSeed = seed;
-  state.board = seededShuffle(mode.characters, seed).map((character) => ({
-    ...character,
-    initials: getInitials(character.name),
-    photoUrl: getLocalPhotoPath(character)
-  }));
+  
+  // Pick exactly 25 random characters from the full pool, then shuffle those 25
+  var pool = seededSample(mode.characters, 25, seed);
+  state.board = seededShuffle(pool, seed).map(function(character) {
+    return {
+      id: character.id,
+      name: character.name,
+      accent: character.accent,
+      initials: getInitials(character.name),
+      photoUrl: getLocalPhotoPath(character, modeId)
+    };
+  });
 
   resetLocalStateForBoard();
   renderCounts();
@@ -187,7 +163,7 @@ function renderBoardInfo() {
     dom.boardInfo.textContent = "Waiting for a round to start.";
     return;
   }
-  dom.boardInfo.textContent = `${getCurrentMode().label} • Seed ${state.shuffleSeed}`;
+  dom.boardInfo.textContent = getCurrentMode().label + " • Seed " + state.shuffleSeed;
 }
 
 function renderCounts() {
@@ -195,12 +171,28 @@ function renderCounts() {
   dom.opponentRemainingCount.textContent = String(state.opponentRemaining);
 }
 
+function renderTurnStatus() {
+  const role = !state.board.length ? "waiting" : getTurnRole();
+  dom.turnStatusCard.dataset.turn = role;
+  if (role === "question") {
+    dom.turnStatusValue.textContent = "Asking";
+  } else if (role === "answer") {
+    dom.turnStatusValue.textContent = "Answering";
+  } else if (role === "pick") {
+    dom.turnStatusValue.textContent = "Pick Secret";
+  } else if (role === "wait") {
+    dom.turnStatusValue.textContent = "Waiting";
+  } else {
+    dom.turnStatusValue.textContent = "Waiting";
+  }
+}
+
 function flashOpponentCount() {
   dom.opponentScoreCard.classList.remove("highlight");
   void dom.opponentScoreCard.offsetWidth;
   dom.opponentScoreCard.classList.add("highlight");
-  window.clearTimeout(state.opponentCountFlashTimer);
-  state.opponentCountFlashTimer = window.setTimeout(() => {
+  clearTimeout(state.opponentCountFlashTimer);
+  state.opponentCountFlashTimer = setTimeout(function() {
     dom.opponentScoreCard.classList.remove("highlight");
   }, 950);
 }
@@ -208,7 +200,7 @@ function flashOpponentCount() {
 function createAvatar(character) {
   const avatar = document.createElement("div");
   avatar.className = "avatar";
-  avatar.style.background = `linear-gradient(135deg, ${character.accent[0]}, ${character.accent[1]})`;
+  avatar.style.background = "linear-gradient(135deg, " + character.accent[0] + ", " + character.accent[1] + ")";
 
   const fallback = document.createElement("span");
   fallback.className = "avatar-fallback";
@@ -217,16 +209,28 @@ function createAvatar(character) {
 
   if (character.photoUrl) {
     avatar.classList.add("has-photo");
-    const image = document.createElement("img");
-    image.src = character.photoUrl;
-    image.alt = `${character.name} photo`;
-    image.loading = "lazy";
-    image.referrerPolicy = "no-referrer";
-    image.addEventListener("error", () => {
-      avatar.classList.remove("has-photo");
-      image.remove();
-    });
-    avatar.appendChild(image);
+    const extensions = ["", ".webp", ".png", ".jpg", ".jpeg"];
+    let extIndex = 0;
+
+    function tryLoadImage() {
+      if (extIndex >= extensions.length) {
+        avatar.classList.remove("has-photo");
+        return;
+      }
+      const image = document.createElement("img");
+      image.src = character.photoUrl + extensions[extIndex];
+      image.alt = character.name + " photo";
+      image.loading = "lazy";
+      image.referrerPolicy = "no-referrer";
+      image.addEventListener("error", function() {
+        image.remove();
+        extIndex++;
+        tryLoadImage();
+      });
+      avatar.appendChild(image);
+    }
+
+    tryLoadImage();
   }
 
   return avatar;
@@ -238,10 +242,22 @@ function renderYourBoard() {
     return;
   }
 
+  if (state.turnPhase === "setup" && getTurnRole() === "wait") {
+    dom.yourBoardContainer.innerHTML = '<div class="empty-state turn-blocked-state"><strong>Waiting for the other player to choose a secret.</strong><span>Your setup turn will come next. Once both secrets are selected, the question round will begin automatically.</span></div>';
+    return;
+  }
+
+  if (state.turnPhase === "play" && getTurnRole() === "answer" && state.secretIndex !== null) {
+    dom.yourBoardContainer.innerHTML = '<div class="empty-state turn-blocked-state"><strong>You are answering right now.</strong><span>Your full board is hidden while the other player asks questions. Keep watching the opponent mini-board to see what they flipped after your answers.</span></div>';
+    return;
+  }
+
   const grid = document.createElement("div");
   grid.className = "board-grid";
+  const boardActionsEnabled = areBoardActionsEnabled();
+  const canGuess = isChannelOpen() && boardActionsEnabled;
 
-  state.board.forEach((character, index) => {
+  state.board.forEach(function(character, index) {
     const card = document.createElement("button");
     card.type = "button";
     card.className = "character-card";
@@ -255,7 +271,7 @@ function renderYourBoard() {
 
     const tileIndex = document.createElement("span");
     tileIndex.className = "tile-index";
-    tileIndex.textContent = `Slot ${index + 1}`;
+    tileIndex.textContent = "Slot " + (index + 1);
 
     const secretToggle = document.createElement("button");
     secretToggle.type = "button";
@@ -264,13 +280,14 @@ function renderYourBoard() {
     if (state.secretIndex === index) {
       secretToggle.classList.add("active");
     }
-    secretToggle.disabled = state.yourEliminated.has(index);
-    secretToggle.addEventListener("click", (event) => {
+    secretToggle.disabled = !canChooseSecret();
+    secretToggle.addEventListener("click", function(event) {
       event.stopPropagation();
       toggleSecret(index);
     });
 
-    topline.append(tileIndex, secretToggle);
+    topline.appendChild(tileIndex);
+    topline.appendChild(secretToggle);
 
     const meta = document.createElement("div");
     meta.className = "card-meta";
@@ -283,8 +300,27 @@ function renderYourBoard() {
     subtext.className = "card-subtext";
     subtext.textContent = state.yourEliminated.has(index) ? "Eliminated from your board" : "Active on your board";
 
-    meta.append(name, subtext);
-    card.append(topline, createAvatar(character), meta);
+    meta.appendChild(name);
+    meta.appendChild(subtext);
+    card.appendChild(topline);
+    card.appendChild(createAvatar(character));
+    card.appendChild(meta);
+
+    const actions = document.createElement("div");
+    actions.className = "card-actions";
+
+    const guessButton = document.createElement("button");
+    guessButton.type = "button";
+    guessButton.className = "secondary-btn card-action-btn";
+    guessButton.textContent = "Guess";
+    guessButton.disabled = !canGuess;
+    guessButton.addEventListener("click", function(event) {
+      event.stopPropagation();
+      makeGuess(index);
+    });
+
+    actions.appendChild(guessButton);
+    card.appendChild(actions);
 
     if (state.secretIndex === index) {
       const badge = document.createElement("div");
@@ -293,12 +329,57 @@ function renderYourBoard() {
       card.appendChild(badge);
     }
 
-    card.addEventListener("click", () => toggleLocalTile(index));
+    card.addEventListener("click", function() { toggleLocalTile(index); });
     grid.appendChild(card);
   });
 
   dom.yourBoardContainer.innerHTML = "";
   dom.yourBoardContainer.appendChild(grid);
+}
+
+function renderSecretPanel() {
+  if (!state.board.length) {
+    dom.secretPanelContainer.innerHTML = '<div class="secret-panel-empty">Start or join a round to choose your private secret.</div>';
+    return;
+  }
+
+  if (state.secretIndex === null) {
+    dom.secretPanelContainer.innerHTML = '<div class="secret-panel-empty">No secret selected yet. Use Mark Secret on any card.</div>';
+    return;
+  }
+
+  const character = state.board[state.secretIndex];
+  const wrapper = document.createElement("div");
+  wrapper.className = "secret-panel-card";
+
+  const meta = document.createElement("div");
+  meta.className = "secret-panel-meta";
+
+  const name = document.createElement("div");
+  name.className = "secret-panel-name";
+  name.textContent = character.name;
+
+  const slot = document.createElement("div");
+  slot.className = "secret-panel-slot";
+  slot.textContent = "Slot " + (state.secretIndex + 1);
+
+  const stateText = document.createElement("div");
+  stateText.className = "secret-panel-state";
+  if (state.yourEliminated.has(state.secretIndex)) {
+    stateText.classList.add("is-eliminated");
+    stateText.textContent = "Eliminated on your board";
+  } else {
+    stateText.textContent = "Still active on your board";
+  }
+
+  meta.appendChild(name);
+  meta.appendChild(slot);
+  meta.appendChild(stateText);
+  wrapper.appendChild(createAvatar(character));
+  wrapper.appendChild(meta);
+
+  dom.secretPanelContainer.innerHTML = "";
+  dom.secretPanelContainer.appendChild(wrapper);
 }
 
 function renderOpponentBoard() {
@@ -310,7 +391,7 @@ function renderOpponentBoard() {
   const grid = document.createElement("div");
   grid.className = "mini-grid";
 
-  state.board.forEach((_, index) => {
+  state.board.forEach(function(_, index) {
     const tile = document.createElement("div");
     tile.className = "mini-tile";
     if (state.opponentEliminated.has(index)) {
@@ -329,7 +410,9 @@ function renderOpponentBoard() {
     back.className = "mini-back";
     back.textContent = "Flipped";
 
-    tile.append(idx, front, back);
+    tile.appendChild(idx);
+    tile.appendChild(front);
+    tile.appendChild(back);
     grid.appendChild(tile);
   });
 
@@ -340,17 +423,21 @@ function renderOpponentBoard() {
 function renderBoards() {
   renderYourBoard();
   renderOpponentBoard();
+  renderSecretPanel();
+  renderTurnStatus();
   renderActionButtons();
+  renderRoundResultOverlay();
 }
 
 function renderActionButtons() {
-  dom.undoBtn.disabled = state.history.length === 0 || !state.board.length;
-  dom.resyncBtn.disabled = !state.board.length;
+  dom.undoBtn.disabled = state.history.length === 0 || !state.board.length || !areBoardActionsEnabled();
+  dom.resyncBtn.disabled = !state.board.length || state.roundLocked;
+  dom.passControlBtn.disabled = !state.board.length || !isChannelOpen() || state.roundLocked || !((state.turnPhase === "setup" && getTurnRole() === "pick" && state.secretIndex !== null) || (state.turnPhase === "play" && getTurnRole() === "question"));
   dom.resetBtn.disabled = !state.board.length;
 }
 
 function getRemainingCount(eliminatedSet) {
-  return getCharacterCount() - eliminatedSet.size;
+  return getCharacterCountForMode(state.modeId) - eliminatedSet.size;
 }
 
 function isChannelOpen() {
@@ -370,26 +457,24 @@ function sendCountUpdate() {
 }
 
 function sendTileToggle(index, eliminated) {
-  sendMessage({ type: MESSAGE_TYPES.TILE_TOGGLE, index, eliminated });
+  sendMessage({ type: MESSAGE_TYPES.TILE_TOGGLE, index: index, eliminated: eliminated });
 }
 
 function sendSync() {
-  if (!state.board.length) {
-    return;
-  }
+  if (!state.board.length) { return; }
 
   sendMessage({
     type: MESSAGE_TYPES.SYNC,
     remaining: state.yourRemaining,
-    eliminated: Array.from(state.yourEliminated).sort((a, b) => a - b)
+    eliminated: Array.from(state.yourEliminated).sort(function(a, b) { return a - b; }),
+    turnPhase: state.turnPhase,
+    turnOwner: state.turnOwner
   });
   setStatus("Resync snapshot sent.");
 }
 
 function sendModeInit() {
-  if (!state.board.length) {
-    return;
-  }
+  if (!state.board.length) { return; }
 
   sendMessage({
     type: MESSAGE_TYPES.MODE_INIT,
@@ -406,30 +491,35 @@ function sendReset(seed) {
   });
 }
 
+function sendTurnUpdate() {
+  sendMessage({ type: MESSAGE_TYPES.TURN_UPDATE, turnPhase: state.turnPhase, turnOwner: state.turnOwner });
+}
+
+function sendGuessRequest(index) {
+  sendMessage({ type: MESSAGE_TYPES.GUESS_REQUEST, index: index });
+}
+
+function sendGuessResult(index, correct) {
+  sendMessage({ type: MESSAGE_TYPES.GUESS_RESULT, index: index, correct: correct });
+}
+
 function toggleSecret(index) {
-  if (state.yourEliminated.has(index)) {
-    return;
-  }
+  if (!canChooseSecret()) { return; }
   state.secretIndex = state.secretIndex === index ? null : index;
-  renderYourBoard();
+  renderBoards();
 }
 
 function toggleLocalTile(index) {
-  if (!state.board.length || index < 0 || index >= state.board.length) {
-    return;
-  }
+  if (!state.board.length || index < 0 || index >= state.board.length || !areBoardActionsEnabled()) { return; }
 
   const eliminated = !state.yourEliminated.has(index);
   if (eliminated) {
     state.yourEliminated.add(index);
-    if (state.secretIndex === index) {
-      state.secretIndex = null;
-    }
   } else {
     state.yourEliminated.delete(index);
   }
 
-  state.history.push({ index, eliminated });
+  state.history.push({ index: index, eliminated: eliminated });
   state.yourRemaining = getRemainingCount(state.yourEliminated);
   renderCounts();
   renderBoards();
@@ -440,11 +530,48 @@ function toggleLocalTile(index) {
   }
 }
 
-function undoLastMove() {
-  const lastMove = state.history.pop();
-  if (!lastMove) {
-    return;
+function lockRound(message) {
+  state.roundLocked = true;
+  setStatus(message);
+  setTimeout(function() { renderBoards(); }, 0);
+}
+
+function lockRoundWithResult(result, message) {
+  state.roundResult = result;
+  state.roundLocked = true;
+  setStatus(message);
+  setTimeout(function() { renderBoards(); }, 0);
+}
+
+function applyWrongGuessElimination(index) {
+  if (state.yourEliminated.has(index)) { return; }
+
+  state.yourEliminated.add(index);
+  state.yourRemaining = getRemainingCount(state.yourEliminated);
+  renderCounts();
+  renderBoards();
+
+  if (isChannelOpen()) {
+    sendTileToggle(index, true);
+    sendCountUpdate();
   }
+}
+
+function makeGuess(index) {
+  if (!state.board.length || index < 0 || index >= state.board.length) { return; }
+  if (!isChannelOpen()) { setStatus("Connect to another player before making a guess.", "error"); return; }
+  if (state.turnPhase !== "play") { setStatus("Finish the secret selection turns before making a guess.", "error"); return; }
+  if (!areBoardActionsEnabled()) { setStatus(getTurnRole() === "answer" ? "Only the current questioner can guess." : "The round is locked. Reset to start a new one.", "error"); return; }
+
+  sendGuessRequest(index);
+  setStatus("Guess sent for " + state.board[index].name + ". Waiting for the other player to confirm.");
+}
+
+function undoLastMove() {
+  if (!areBoardActionsEnabled()) { return; }
+
+  const lastMove = state.history.pop();
+  if (!lastMove) { return; }
 
   if (lastMove.eliminated) {
     state.yourEliminated.delete(lastMove.index);
@@ -464,15 +591,26 @@ function undoLastMove() {
   setStatus("Last local elimination was undone.");
 }
 
+function handleNewGameRequest() {
+  if (!state.isHost || (state.roundResult !== "win" && state.roundResult !== "lose")) { return; }
+
+  const seed = createSeed();
+  initializeBoard(state.modeId, seed);
+  setStatus("New game started. Host will choose a secret first.");
+
+  if (isChannelOpen()) {
+    sendReset(seed);
+    sendSync();
+  }
+}
+
 function startFreshRound(seed, source) {
   initializeBoard(state.modeId, seed);
   setStatus(source === "remote" ? "Remote round reset received. New shuffled board loaded." : "Fresh round started with a new shuffle.");
 }
 
 function handleResetRequest() {
-  if (!state.board.length) {
-    return;
-  }
+  if (!state.board.length) { return; }
 
   const seed = createSeed();
   startFreshRound(seed, "local");
@@ -482,18 +620,48 @@ function handleResetRequest() {
   }
 }
 
+function passQuestionControl() {
+  if (!state.board.length || !isChannelOpen() || state.roundLocked) { return; }
+
+  if (state.turnPhase === "setup") {
+    if (getTurnRole() !== "pick" || state.secretIndex === null) { return; }
+
+    if (state.turnOwner === "host") {
+      state.turnOwner = "joiner";
+      renderBoards();
+      sendTurnUpdate();
+      setStatus("Your secret is locked in. The other player can now choose their secret.");
+      return;
+    }
+
+    state.turnPhase = "play";
+    state.turnOwner = "host";
+    renderBoards();
+    sendTurnUpdate();
+    setStatus("Both secrets are selected. The question round begins with the host asking first.");
+    return;
+  }
+
+  if (getTurnRole() !== "question") { return; }
+
+  state.turnOwner = state.turnOwner === "host" ? "joiner" : "host";
+  renderBoards();
+  sendTurnUpdate();
+  setStatus("Question control passed to the other player.");
+}
+
 function validateRemoteMessage(message) {
-  if (!message || typeof message !== "object") {
-    return false;
-  }
+  if (!message || typeof message !== "object") { return false; }
+  if (!Object.values(MESSAGE_TYPES).includes(message.type)) { return false; }
 
-  if (!Object.values(MESSAGE_TYPES).includes(message.type)) {
-    return false;
-  }
+  const count = getCharacterCountForMode(state.modeId);
 
-  const count = getCharacterCount();
   if (message.type === MESSAGE_TYPES.MODE_INIT || message.type === MESSAGE_TYPES.RESET) {
-    return typeof message.mode === "string" && Boolean(GAME_MODES[message.mode]) && typeof message.shuffleSeed === "string";
+    return typeof message.mode === "string" && Boolean(getModeById(message.mode)) && typeof message.shuffleSeed === "string";
+  }
+
+  if (message.type === MESSAGE_TYPES.TURN_UPDATE) {
+    return (message.turnPhase === "setup" || message.turnPhase === "play") && (message.turnOwner === "host" || message.turnOwner === "joiner");
   }
 
   if (message.type === MESSAGE_TYPES.TILE_TOGGLE) {
@@ -509,7 +677,17 @@ function validateRemoteMessage(message) {
       && message.remaining >= 0
       && message.remaining <= count
       && Array.isArray(message.eliminated)
-      && message.eliminated.every((index) => Number.isInteger(index) && index >= 0 && index < count);
+      && message.eliminated.every(function(idx) { return Number.isInteger(idx) && idx >= 0 && idx < count; })
+      && (message.turnPhase === "setup" || message.turnPhase === "play")
+      && (message.turnOwner === "host" || message.turnOwner === "joiner");
+  }
+
+  if (message.type === MESSAGE_TYPES.GUESS_REQUEST) {
+    return Number.isInteger(message.index) && message.index >= 0 && message.index < count;
+  }
+
+  if (message.type === MESSAGE_TYPES.GUESS_RESULT) {
+    return Number.isInteger(message.index) && message.index >= 0 && message.index < count && typeof message.correct === "boolean";
   }
 
   return true;
@@ -532,11 +710,10 @@ function handleRemoteMessage(event) {
   switch (message.type) {
     case MESSAGE_TYPES.MODE_INIT:
       initializeBoard(message.mode, message.shuffleSeed);
-      setStatus(`Connected round ready. ${GAME_MODES[message.mode].label} board loaded.`);
-      if (isChannelOpen()) {
-        sendSync();
-      }
+      setStatus("Connected round ready. " + getModeById(message.mode).label + " board loaded.");
+      if (isChannelOpen()) { sendSync(); }
       break;
+
     case MESSAGE_TYPES.TILE_TOGGLE:
       if (message.eliminated) {
         state.opponentEliminated.add(message.index);
@@ -545,21 +722,58 @@ function handleRemoteMessage(event) {
       }
       renderOpponentBoard();
       break;
+
     case MESSAGE_TYPES.COUNT_UPDATE:
       applyOpponentCount(message.remaining);
       break;
+
     case MESSAGE_TYPES.SYNC:
       state.opponentEliminated = new Set(message.eliminated);
+      state.turnPhase = message.turnPhase;
+      state.turnOwner = message.turnOwner;
       applyOpponentCount(message.remaining);
-      renderOpponentBoard();
+      renderBoards();
       setStatus("Remote board resynced.");
       break;
+
     case MESSAGE_TYPES.RESET:
       state.modeId = message.mode;
       startFreshRound(message.shuffleSeed, "remote");
       break;
-    default:
+
+    case MESSAGE_TYPES.TURN_UPDATE:
+      state.turnPhase = message.turnPhase;
+      state.turnOwner = message.turnOwner;
+      renderBoards();
+      if (state.turnPhase === "setup") {
+        setStatus(getTurnRole() === "pick" ? "It is now your turn to choose your secret." : "Waiting for the other player to choose their secret.");
+      } else {
+        setStatus(getTurnRole() === "question" ? "It is now your turn to ask questions." : "Question control passed to the other player.");
+      }
       break;
+
+    case MESSAGE_TYPES.GUESS_REQUEST: {
+      const guessedCharacter = state.board[message.index];
+      const correct = state.secretIndex !== null && message.index === state.secretIndex;
+      sendGuessResult(message.index, correct);
+      if (correct) {
+        lockRoundWithResult("lose", "Opponent guessed correctly with " + guessedCharacter.name + ". Round locked until reset.");
+      } else {
+        setStatus("Opponent guessed " + guessedCharacter.name + ". Incorrect.");
+      }
+      return;
+    }
+
+    case MESSAGE_TYPES.GUESS_RESULT: {
+      const guessedCharacter = state.board[message.index];
+      if (message.correct) {
+        lockRoundWithResult("win", "Correct. " + guessedCharacter.name + " was the right guess. Round locked until reset.");
+      } else {
+        applyWrongGuessElimination(message.index);
+        setStatus("Incorrect. " + guessedCharacter.name + " was eliminated from your board and the round continues.");
+      }
+      return;
+    }
   }
 }
 
@@ -569,22 +783,14 @@ function closePeerConnection() {
     state.dataChannel.onclose = null;
     state.dataChannel.onerror = null;
     state.dataChannel.onmessage = null;
-    try {
-      state.dataChannel.close();
-    } catch (error) {
-      // Ignore close errors for torn-down channels.
-    }
+    try { state.dataChannel.close(); } catch (error) { }
   }
 
   if (state.peerConnection) {
     state.peerConnection.ondatachannel = null;
     state.peerConnection.onconnectionstatechange = null;
     state.peerConnection.oniceconnectionstatechange = null;
-    try {
-      state.peerConnection.close();
-    } catch (error) {
-      // Ignore close errors for torn-down peer connections.
-    }
+    try { state.peerConnection.close(); } catch (error) { }
   }
 
   state.peerConnection = null;
@@ -594,8 +800,10 @@ function closePeerConnection() {
 function attachDataChannel(channel) {
   state.dataChannel = channel;
 
-  channel.onopen = () => {
+  channel.onopen = function() {
     updateConnectionStatus("connected", "Connected");
+    collapseConnectionPanel();
+    renderBoards();
     setStatus("Peer connection open. Board updates will sync live.");
     if (state.isHost && state.board.length) {
       sendModeInit();
@@ -605,13 +813,15 @@ function attachDataChannel(channel) {
     }
   };
 
-  channel.onclose = () => {
+  channel.onclose = function() {
     updateConnectionStatus("disconnected", "Disconnected");
+    renderBoards();
     setStatus("Data channel closed. Reconnect by exchanging a new offer/answer.", "error");
   };
 
-  channel.onerror = () => {
+  channel.onerror = function() {
     updateConnectionStatus("error", "Connection error");
+    renderBoards();
     setStatus("A data channel error occurred.", "error");
   };
 
@@ -628,11 +838,11 @@ function createPeerConnection() {
     ]
   });
 
-  peerConnection.ondatachannel = (event) => {
+  peerConnection.ondatachannel = function(event) {
     attachDataChannel(event.channel);
   };
 
-  peerConnection.onconnectionstatechange = () => {
+  peerConnection.onconnectionstatechange = function() {
     const currentState = peerConnection.connectionState;
     if (currentState === "connected") {
       updateConnectionStatus("connected", "Connected");
@@ -648,7 +858,7 @@ function createPeerConnection() {
     }
   };
 
-  peerConnection.oniceconnectionstatechange = () => {
+  peerConnection.oniceconnectionstatechange = function() {
     if (peerConnection.iceConnectionState === "failed") {
       updateConnectionStatus("error", "ICE failed");
     }
@@ -658,16 +868,28 @@ function createPeerConnection() {
   return peerConnection;
 }
 
-function waitForIceGatheringComplete(peerConnection) {
+function updateLocalSignalOutput(peerConnection) {
+  if (!peerConnection.localDescription) { return; }
+  dom.localSignalOutput.value = JSON.stringify(peerConnection.localDescription);
+}
+
+function waitForIceGatheringComplete(peerConnection, timeoutMs) {
+  timeoutMs = timeoutMs || 4000;
   if (peerConnection.iceGatheringState === "complete") {
-    return Promise.resolve();
+    return Promise.resolve("complete");
   }
 
-  return new Promise((resolve) => {
+  return new Promise(function(resolve) {
+    var timeoutId = setTimeout(function() {
+      peerConnection.removeEventListener("icegatheringstatechange", handleStateChange);
+      resolve("timeout");
+    }, timeoutMs);
+
     function handleStateChange() {
       if (peerConnection.iceGatheringState === "complete") {
+        clearTimeout(timeoutId);
         peerConnection.removeEventListener("icegatheringstatechange", handleStateChange);
-        resolve();
+        resolve("complete");
       }
     }
 
@@ -689,10 +911,17 @@ async function createOfferFlow() {
 
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
-    await waitForIceGatheringComplete(peerConnection);
+    updateLocalSignalOutput(peerConnection);
+    setStatus("Offer created. Signal text is ready and may keep updating for a few seconds while network candidates are added.");
 
-    dom.localSignalOutput.value = JSON.stringify(peerConnection.localDescription);
-    setStatus("Offer ready. Send the text to the other player, then paste their answer and click Accept Answer.");
+    const iceResult = await waitForIceGatheringComplete(peerConnection);
+    updateLocalSignalOutput(peerConnection);
+
+    if (iceResult === "timeout") {
+      setStatus("Offer text is ready. ICE gathering is taking longer than usual, but you can already copy and send the signal.");
+    } else {
+      setStatus("Offer ready. Send the text to the other player, then paste their answer and click Accept Answer.");
+    }
   } catch (error) {
     console.error(error);
     updateConnectionStatus("error", "Offer failed");
@@ -722,10 +951,17 @@ async function createAnswerFlow() {
     await peerConnection.setRemoteDescription(parsed.value);
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
-    await waitForIceGatheringComplete(peerConnection);
+    updateLocalSignalOutput(peerConnection);
+    setStatus("Answer created. Signal text is ready and may keep updating for a few seconds while network candidates are added.");
 
-    dom.localSignalOutput.value = JSON.stringify(peerConnection.localDescription);
-    setStatus("Answer ready. Send it back to the host. The board will load when the host finishes connecting.");
+    const iceResult = await waitForIceGatheringComplete(peerConnection);
+    updateLocalSignalOutput(peerConnection);
+
+    if (iceResult === "timeout") {
+      setStatus("Answer text is ready. ICE gathering is taking longer than usual, but you can already copy and send the signal.");
+    } else {
+      setStatus("Answer ready. Send it back to the host. The board will load when the host finishes connecting.");
+    }
   } catch (error) {
     console.error(error);
     updateConnectionStatus("error", "Answer failed");
@@ -779,15 +1015,43 @@ async function copyLocalSignal() {
   }
 }
 
-function handleModeSelection(event) {
-  state.modeId = event.target.value;
-  if (!state.board.length || isChannelOpen()) {
+async function sendToWhatsApp(isLocal) {
+  const text = isLocal ? dom.localSignalOutput.value.trim() : dom.remoteSignalInput.value.trim();
+  if (!text) {
+    setStatus("No signal text to send.", "error");
     return;
   }
+
+  var message = encodeURIComponent(text);
+  var whatsappUrl = "https://wa.me/?text=" + message;
+
+  try {
+    window.open(whatsappUrl, "_blank");
+  } catch (error) {
+    setStatus("Could not open WhatsApp. Copy the signal manually.", "error");
+  }
+}
+
+async function pasteRemoteSignal() {
+  try {
+    var text = await navigator.clipboard.readText();
+    dom.remoteSignalInput.value = text;
+    setStatus("Signal pasted from clipboard.");
+  } catch (error) {
+    setStatus("Could not paste. Please paste manually.", "error");
+  }
+}
+
+function handleModeSelection(event) {
+  state.modeId = event.target.value;
+  if (!state.board.length || isChannelOpen()) { return; }
   renderBoardInfo();
 }
 
 function bootstrap() {
+  populateModeSelect("modeSelect");
+  state.yourRemaining = getCharacterCountForMode(state.modeId);
+  state.opponentRemaining = getCharacterCountForMode(state.modeId);
   renderCounts();
   renderBoards();
   renderBoardInfo();
@@ -796,12 +1060,18 @@ function bootstrap() {
 
   dom.createOfferBtn.addEventListener("click", createOfferFlow);
   dom.copySignalBtn.addEventListener("click", copyLocalSignal);
+  dom.whatsappSignalBtn.addEventListener("click", function() { sendToWhatsApp(true); });
+  dom.whatsappRemoteBtn.addEventListener("click", function() { sendToWhatsApp(false); });
+  dom.pasteRemoteBtn.addEventListener("click", pasteRemoteSignal);
   dom.createAnswerBtn.addEventListener("click", createAnswerFlow);
   dom.acceptAnswerBtn.addEventListener("click", acceptAnswerFlow);
   dom.undoBtn.addEventListener("click", undoLastMove);
   dom.resyncBtn.addEventListener("click", sendSync);
+  dom.passControlBtn.addEventListener("click", passQuestionControl);
   dom.resetBtn.addEventListener("click", handleResetRequest);
   dom.modeSelect.addEventListener("change", handleModeSelection);
+  dom.connectionPanelToggle.addEventListener("click", toggleConnectionPanel);
+  dom.newGameBtn.addEventListener("click", handleNewGameRequest);
 }
 
 bootstrap();
