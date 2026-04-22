@@ -2,6 +2,7 @@ const GAME_MODES = {
   bollywood: {
     id: "bollywood",
     label: "Bollywood Celebrities",
+    extensions: [".jpg", ".jpeg", ".png"],
     characters: [
       { id: "shah_rukh_khan", name: "Shah Rukh Khan", accent: ["#4568dc", "#b06ab3"] },
       { id: "salman_khan", name: "Salman Khan", accent: ["#11998e", "#38ef7d"] },
@@ -28,6 +29,7 @@ const GAME_MODES = {
   clashofclans: {
     id: "clashofclans",
     label: "Clash of Clans",
+    extensions: [".webp", ".png"],
     characters: [
       { id: "barbarian", name: "Barbarian", accent: ["#d4881f", "#f5a623"] },
       { id: "archer", name: "Archer", accent: ["#bd10e0", "#7a0e9b"] },
@@ -53,7 +55,6 @@ const GAME_MODES = {
       { id: "golem", name: "Golem", accent: ["#f5a623", "#a67b28"] },
       { id: "wall_breaker", name: "Wall Breaker", accent: ["#d4881f", "#f5a623"] },
       { id: "hog_rider", name: "Hog Rider", accent: ["#7ed321", "#5d9c1c"] },
-      { id: "executioner", name: "Executioner", accent: ["#4a90e2", "#2d6eb5"] },
       { id: "bowler", name: "Bowler", accent: ["#4a90e2", "#2d6eb5"] },
       { id: "dragon_duke", name: "Dragon Duke", accent: ["#f5a623", "#b8a04f"] },
       { id: "dragon_rider", name: "Dragon Rider", accent: ["#f5a623", "#b8a04f"] },

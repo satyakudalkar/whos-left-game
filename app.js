@@ -133,22 +133,23 @@ function renderRoundResultOverlay() {
 function initializeBoard(modeId, seed) {
   const mode = getModeById(modeId);
   if (!mode) {
-    throw new Error("Unknown mode selected.");
+    throw new Error("Mode not found: " + modeId);
   }
 
   state.modeId = modeId;
   dom.modeSelect.value = modeId;
   state.shuffleSeed = seed;
   
-  // Pick exactly 25 random characters from the full pool, then shuffle those 25
   var pool = seededSample(mode.characters, 25, seed);
+  var modeExtensions = mode.extensions || [".webp", ".png", ".jpg", ".jpeg"];
   state.board = seededShuffle(pool, seed).map(function(character) {
     return {
       id: character.id,
       name: character.name,
       accent: character.accent,
       initials: getInitials(character.name),
-      photoUrl: getLocalPhotoPath(character, modeId)
+      photoUrl: getLocalPhotoPath(character, modeId),
+      extensions: modeExtensions
     };
   });
 
@@ -156,6 +157,10 @@ function initializeBoard(modeId, seed) {
   renderCounts();
   renderBoards();
   renderBoardInfo();
+}
+
+function getCurrentMode() {
+  return getModeById(state.modeId);
 }
 
 function renderBoardInfo() {
@@ -207,18 +212,18 @@ function createAvatar(character) {
   fallback.textContent = character.initials;
   avatar.appendChild(fallback);
 
-  if (character.photoUrl) {
+if (character.photoUrl) {
     avatar.classList.add("has-photo");
-    const extensions = ["", ".webp", ".png", ".jpg", ".jpeg"];
-    let extIndex = 0;
+    var charExtensions = character.extensions || [".webp", ".png", ".jpg", ".jpeg"];
+    var extIndex = 0;
 
     function tryLoadImage() {
-      if (extIndex >= extensions.length) {
+      if (extIndex >= charExtensions.length) {
         avatar.classList.remove("has-photo");
         return;
       }
-      const image = document.createElement("img");
-      image.src = character.photoUrl + extensions[extIndex];
+      var image = document.createElement("img");
+      image.src = character.photoUrl + charExtensions[extIndex];
       image.alt = character.name + " photo";
       image.loading = "lazy";
       image.referrerPolicy = "no-referrer";
@@ -903,7 +908,7 @@ async function createOfferFlow() {
     state.modeId = dom.modeSelect.value;
     initializeBoard(state.modeId, createSeed());
     updateConnectionStatus("connecting", "Creating offer");
-    setStatus("Creating peer offer. Wait for the signal text to appear.");
+    setStatus("Creating peer offer...");
 
     const peerConnection = createPeerConnection();
     const channel = peerConnection.createDataChannel("whos-left");
@@ -912,20 +917,18 @@ async function createOfferFlow() {
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
     updateLocalSignalOutput(peerConnection);
-    setStatus("Offer created. Signal text is ready and may keep updating for a few seconds while network candidates are added.");
+    setStatus("Offer ready. Copy and send it to the other player.");
 
-    const iceResult = await waitForIceGatheringComplete(peerConnection);
-    updateLocalSignalOutput(peerConnection);
-
-    if (iceResult === "timeout") {
-      setStatus("Offer text is ready. ICE gathering is taking longer than usual, but you can already copy and send the signal.");
-    } else {
-      setStatus("Offer ready. Send the text to the other player, then paste their answer and click Accept Answer.");
-    }
+    Promise.race([
+      waitForIceGatheringComplete(peerConnection),
+      new Promise(r => setTimeout(r, 5000))
+    ]).then(function() {
+      updateLocalSignalOutput(peerConnection);
+    });
   } catch (error) {
-    console.error(error);
+    console.error("createOfferFlow error:", error);
     updateConnectionStatus("error", "Offer failed");
-    setStatus("Failed to create an offer.", "error");
+    setStatus("Failed to create offer: " + error.message, "error");
   }
 }
 
@@ -948,20 +951,20 @@ async function createAnswerFlow() {
     setStatus("Creating answer from the pasted offer.");
 
     const peerConnection = createPeerConnection();
+    
     await peerConnection.setRemoteDescription(parsed.value);
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
     updateLocalSignalOutput(peerConnection);
     setStatus("Answer created. Signal text is ready and may keep updating for a few seconds while network candidates are added.");
 
-    const iceResult = await waitForIceGatheringComplete(peerConnection);
-    updateLocalSignalOutput(peerConnection);
-
-    if (iceResult === "timeout") {
-      setStatus("Answer text is ready. ICE gathering is taking longer than usual, but you can already copy and send the signal.");
-    } else {
+    Promise.race([
+      waitForIceGatheringComplete(peerConnection),
+      new Promise(r => setTimeout(r, 5000))
+    ]).then(function() {
+      updateLocalSignalOutput(peerConnection);
       setStatus("Answer ready. Send it back to the host. The board will load when the host finishes connecting.");
-    }
+    });
   } catch (error) {
     console.error(error);
     updateConnectionStatus("error", "Answer failed");
@@ -1044,34 +1047,39 @@ async function pasteRemoteSignal() {
 
 function handleModeSelection(event) {
   state.modeId = event.target.value;
-  if (!state.board.length || isChannelOpen()) { return; }
-  renderBoardInfo();
+  if (state.board.length || isChannelOpen()) { return; }
+  initializeBoard(state.modeId, createSeed());
 }
 
 function bootstrap() {
-  populateModeSelect("modeSelect");
-  state.yourRemaining = getCharacterCountForMode(state.modeId);
-  state.opponentRemaining = getCharacterCountForMode(state.modeId);
-  renderCounts();
-  renderBoards();
-  renderBoardInfo();
-  setStatus(state.statusMessage);
-  updateConnectionStatus("idle", "Not connected");
+  try {
+    populateModeSelect("modeSelect");
+    state.yourRemaining = getCharacterCountForMode(state.modeId);
+    state.opponentRemaining = getCharacterCountForMode(state.modeId);
+    renderCounts();
+    renderBoards();
+    renderBoardInfo();
+    setStatus(state.statusMessage);
+    updateConnectionStatus("idle", "Not connected");
 
-  dom.createOfferBtn.addEventListener("click", createOfferFlow);
-  dom.copySignalBtn.addEventListener("click", copyLocalSignal);
-  dom.whatsappSignalBtn.addEventListener("click", function() { sendToWhatsApp(true); });
-  dom.whatsappRemoteBtn.addEventListener("click", function() { sendToWhatsApp(false); });
-  dom.pasteRemoteBtn.addEventListener("click", pasteRemoteSignal);
-  dom.createAnswerBtn.addEventListener("click", createAnswerFlow);
-  dom.acceptAnswerBtn.addEventListener("click", acceptAnswerFlow);
-  dom.undoBtn.addEventListener("click", undoLastMove);
-  dom.resyncBtn.addEventListener("click", sendSync);
-  dom.passControlBtn.addEventListener("click", passQuestionControl);
-  dom.resetBtn.addEventListener("click", handleResetRequest);
-  dom.modeSelect.addEventListener("change", handleModeSelection);
-  dom.connectionPanelToggle.addEventListener("click", toggleConnectionPanel);
-  dom.newGameBtn.addEventListener("click", handleNewGameRequest);
+    dom.createOfferBtn.addEventListener("click", createOfferFlow);
+    dom.copySignalBtn.addEventListener("click", copyLocalSignal);
+    dom.whatsappSignalBtn.addEventListener("click", function() { sendToWhatsApp(true); });
+    dom.whatsappRemoteBtn.addEventListener("click", function() { sendToWhatsApp(false); });
+    dom.pasteRemoteBtn.addEventListener("click", pasteRemoteSignal);
+    dom.createAnswerBtn.addEventListener("click", createAnswerFlow);
+    dom.acceptAnswerBtn.addEventListener("click", acceptAnswerFlow);
+    dom.undoBtn.addEventListener("click", undoLastMove);
+    dom.resyncBtn.addEventListener("click", sendSync);
+    dom.passControlBtn.addEventListener("click", passQuestionControl);
+    dom.resetBtn.addEventListener("click", handleResetRequest);
+    dom.modeSelect.addEventListener("change", handleModeSelection);
+    dom.connectionPanelToggle.addEventListener("click", toggleConnectionPanel);
+    dom.newGameBtn.addEventListener("click", handleNewGameRequest);
+  } catch (error) {
+    console.error("Bootstrap error:", error);
+    setStatus("Error during initialization.", "error");
+  }
 }
 
 bootstrap();
