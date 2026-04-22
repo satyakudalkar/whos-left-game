@@ -24,7 +24,12 @@ const GAME_MODES = {
       { id: "madhuri_dixit", name: "Madhuri Dixit", accent: ["#ff512f", "#dd2476"] },
       { id: "kajol", name: "Kajol", accent: ["#8360c3", "#2ebf91"] },
       { id: "vidya_balan", name: "Vidya Balan", accent: ["#41295a", "#2f0743"] },
-      { id: "kiara_advani", name: "Kiara Advani", accent: ["#4776e6", "#8e54e9"] }
+      { id: "kiara_advani", name: "Kiara Advani", accent: ["#4776e6", "#8e54e9"] },
+      { id: "shahid_kapoor", name: "Shahid Kapoor", accent: ["#11998e", "#38ef7d"] },
+      { id: "varun_dhawan", name: "Varun Dhawan", accent: ["#f46b45", "#eea849"] },
+      { id: "ayushmann_khurrana", name: "Ayushmann Khurrana", accent: ["#134e5e", "#71b280"] },
+      { id: "shraddha_kapoor", name: "Shraddha Kapoor", accent: ["#ff758c", "#ff7eb3"] },
+      { id: "tara_sutaria", name: "Tara Sutaria", accent: ["#4776e6", "#8e54e9"] }
     ]
   },
   clashofclans: {
