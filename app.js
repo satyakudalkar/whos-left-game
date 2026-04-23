@@ -1160,8 +1160,30 @@ function handleModeSelection(event) {
   state.modeId = event.target.value;
 }
 
+function toggleTheme() {
+  const currentTheme = document.documentElement.getAttribute("data-theme");
+  const newTheme = currentTheme === "light" ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", newTheme);
+  localStorage.setItem("theme", newTheme);
+  
+  if (dom.themeIcon) {
+    dom.themeIcon.textContent = newTheme === "light" ? "🌙" : "☀️";
+  }
+}
+
+function initTheme() {
+  const savedTheme = localStorage.getItem("theme");
+  if (savedTheme) {
+    document.documentElement.setAttribute("data-theme", savedTheme);
+    if (dom.themeIcon) {
+      dom.themeIcon.textContent = savedTheme === "light" ? "🌙" : "☀️";
+    }
+  }
+}
+
 function bootstrap() {
   try {
+    initTheme();
     populateModeSelect("modeSelect");
     state.yourRemaining = 25;
     state.opponentRemaining = 25;
@@ -1188,6 +1210,7 @@ function bootstrap() {
     dom.modeSelect.addEventListener("change", handleModeSelection);
     dom.connectionPanelToggle.addEventListener("click", toggleConnectionPanel);
     dom.newGameBtn.addEventListener("click", handleNewGameRequest);
+    dom.themeToggle.addEventListener("click", toggleTheme);
     if (dom.startGameBtn) {
       dom.startGameBtn.addEventListener("click", startGame);
     }

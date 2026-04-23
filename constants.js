@@ -45,5 +45,7 @@ const dom = {
   newGameBtn: document.getElementById("newGameBtn"),
   confettiField: document.getElementById("confettiField"),
   startGameSection: document.getElementById("startGameSection"),
-  startGameBtn: document.getElementById("startGameBtn")
+  startGameBtn: document.getElementById("startGameBtn"),
+  themeToggle: document.getElementById("themeToggle"),
+  themeIcon: document.querySelector(".theme-icon")
 };
