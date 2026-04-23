@@ -620,7 +620,9 @@ function handleNewGameRequest() {
 
   const seed = createSeed();
   initializeBoard(state.modeId, seed);
-  setStatus("New game started. Host will choose a secret first.");
+  dom.modeSelect.disabled = false;
+  dom.startGameSection.hidden = false;
+  setStatus("New game ready. Click Start Game to begin a new round.");
 
   if (isChannelOpen()) {
     sendReset(seed);
@@ -639,6 +641,7 @@ function handleResetRequest() {
   const seed = createSeed();
   startFreshRound(seed, "local");
   if (state.isHost) {
+    dom.modeSelect.disabled = false;
     dom.startGameSection.hidden = false;
   }
   if (isChannelOpen()) {
@@ -826,6 +829,7 @@ function closePeerConnection() {
 
   state.peerConnection = null;
   state.dataChannel = null;
+  document.body.classList.remove('joiner');
 }
 
 function attachDataChannel(channel) {
@@ -839,6 +843,9 @@ function attachDataChannel(channel) {
     if (state.isHost) {
       dom.modeSelect.disabled = false;
       dom.startGameSection.hidden = false;
+      document.body.classList.remove('joiner');
+    } else {
+      document.body.classList.add('joiner');
     }
     if (state.isHost && state.board.length) {
       sendModeInit();
@@ -848,12 +855,22 @@ function attachDataChannel(channel) {
     }
   };
 
-  channel.onclose = function() {
+channel.onclose = function() {
     updateConnectionStatus("disconnected", "Disconnected");
     dom.modeSelect.disabled = false;
     dom.startGameSection.hidden = true;
+    document.body.classList.remove('joiner');
     renderBoards();
     setStatus("Data channel closed. Reconnect by exchanging a new offer/answer.", "error");
+  };
+
+  channel.onerror = function() {
+    updateConnectionStatus("error", "Connection error");
+    dom.modeSelect.disabled = false;
+    dom.startGameSection.hidden = true;
+    document.body.classList.remove('joiner');
+    renderBoards();
+    setStatus("A data channel error occurred.", "error");
   };
 
   channel.onerror = function() {
@@ -976,6 +993,8 @@ function startGame() {
   
   state.modeId = dom.modeSelect.value;
   initializeBoard(state.modeId, createSeed());
+  dom.modeSelect.disabled = true;
+  dom.startGameSection.hidden = true;
   setStatus("Game started with " + getModeById(state.modeId).label + ". Choose your secret first.");
   
   if (isChannelOpen()) {

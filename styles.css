@@ -318,6 +318,25 @@ button:disabled {
   border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
+.turn-card {
+  grid-column: 1 / -1;
+  padding: 18px 14px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: center;
+}
+
+.turn-card .label {
+  margin-bottom: 8px;
+}
+
+.turn-card .value {
+  font-size: clamp(1.25rem, 3vw, 1.75rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
 .score-card .label {
   color: var(--muted);
   font-size: 0.84rem;
@@ -457,6 +476,7 @@ button:disabled {
   min-height: 216px;
   overflow: hidden;
   isolation: isolate;
+  transition: border-color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
 }
 
 .character-card::before {
@@ -473,10 +493,22 @@ button:disabled {
   z-index: 1;
 }
 
+.character-card:not(.is-eliminated):hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateY(-3px);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
+}
+
+.character-card:not(.is-eliminated):hover .avatar {
+  transform: scale(1.04);
+  box-shadow: 0 20px 38px rgba(0, 0, 0, 0.32);
+}
+
 .character-card.is-eliminated {
   opacity: 0.55;
   transform: scale(0.99);
   filter: grayscale(0.78);
+  transition: opacity 300ms ease, transform 300ms ease, filter 300ms ease;
 }
 
 .character-card.is-eliminated::after {
@@ -502,6 +534,7 @@ button:disabled {
   color: white;
   background: linear-gradient(135deg, rgba(69, 104, 220, 1), rgba(176, 106, 179, 1));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 16px 28px rgba(0, 0, 0, 0.22);
+  transition: transform 200ms ease, box-shadow 200ms ease;
 }
 
 .avatar img {
@@ -844,3 +877,86 @@ button:disabled {
     align-items: flex-start;
   }
 }
+
+body.joiner .danger-btn,
+body.joiner #resetBtn {
+  display: none;
+}
+
+.pass-turn-section {
+  margin-top: 14px;
+}
+
+.pass-turn-section .secondary-btn {
+  width: 100%;
+  padding: 12px 14px;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.hero {
+  animation: fadeInUp 500ms ease-out both;
+}
+
+.sidebar {
+  animation: slideInLeft 500ms ease-out 150ms both;
+}
+
+.board-column {
+  animation: fadeIn 600ms ease-out 250ms both;
+}
+
+.character-card {
+  animation: fadeInUp 350ms ease-out both;
+}
+
+.board-grid .character-card:nth-child(1) { animation-delay: 0ms; }
+.board-grid .character-card:nth-child(2) { animation-delay: 20ms; }
+.board-grid .character-card:nth-child(3) { animation-delay: 40ms; }
+.board-grid .character-card:nth-child(4) { animation-delay: 60ms; }
+.board-grid .character-card:nth-child(5) { animation-delay: 80ms; }
+.board-grid .character-card:nth-child(6) { animation-delay: 100ms; }
+.board-grid .character-card:nth-child(7) { animation-delay: 120ms; }
+.board-grid .character-card:nth-child(8) { animation-delay: 140ms; }
+.board-grid .character-card:nth-child(9) { animation-delay: 160ms; }
+.board-grid .character-card:nth-child(10) { animation-delay: 180ms; }
+.board-grid .character-card:nth-child(11) { animation-delay: 200ms; }
+.board-grid .character-card:nth-child(12) { animation-delay: 220ms; }
+.board-grid .character-card:nth-child(13) { animation-delay: 240ms; }
+.board-grid .character-card:nth-child(14) { animation-delay: 260ms; }
+.board-grid .character-card:nth-child(15) { animation-delay: 280ms; }
+.board-grid .character-card:nth-child(16) { animation-delay: 300ms; }
+.board-grid .character-card:nth-child(17) { animation-delay: 320ms; }
+.board-grid .character-card:nth-child(18) { animation-delay: 340ms; }
+.board-grid .character-card:nth-child(19) { animation-delay: 360ms; }
+.board-grid .character-card:nth-child(20) { animation-delay: 380ms; }
+.board-grid .character-card:nth-child(21) { animation-delay: 400ms; }
+.board-grid .character-card:nth-child(22) { animation-delay: 420ms; }
+.board-grid .character-card:nth-child(23) { animation-delay: 440ms; }
+.board-grid .character-card:nth-child(24) { animation-delay: 460ms; }
+.board-grid .character-card:nth-child(25) { animation-delay: 480ms; }
