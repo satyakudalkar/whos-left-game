@@ -43,5 +43,7 @@ const dom = {
   roundResultTitle: document.getElementById("roundResultTitle"),
   roundResultBody: document.getElementById("roundResultBody"),
   newGameBtn: document.getElementById("newGameBtn"),
-  confettiField: document.getElementById("confettiField")
+  confettiField: document.getElementById("confettiField"),
+  startGameSection: document.getElementById("startGameSection"),
+  startGameBtn: document.getElementById("startGameBtn")
 };

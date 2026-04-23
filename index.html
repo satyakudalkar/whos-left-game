@@ -25,10 +25,10 @@
         <section class="panel-section">
           <h3>Game Mode</h3>
           <label for="modeSelect">Board Mode</label>
-          <select id="modeSelect">
-            <option value="bollywood">Bollywood Celebrities</option>
+          <select id="modeSelect" disabled>
+            <option value="" disabled selected>Host selects mode</option>
           </select>
-          <span class="tiny-note">More modes can be added later.</span>
+          <span class="tiny-note">Host selects before creating offer.</span>
         </section>
 
         <section class="panel-section collapsible" id="connectionPanel">
@@ -94,6 +94,12 @@
           <span class="tiny-note">
             The first two turns are reserved for secret selection. Once both secrets are locked in, the normal question and answer flow begins.
           </span>
+        </section>
+
+        <section class="panel-section" id="startGameSection" hidden>
+          <h3>Start Game</h3>
+          <button id="startGameBtn" class="primary-btn" style="width: 100%;">Start Game</button>
+          <span class="tiny-note">Select a game mode above, then start the game.</span>
         </section>
 
         <section class="panel-section">

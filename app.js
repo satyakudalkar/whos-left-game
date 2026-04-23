@@ -17,7 +17,9 @@ const state = {
   roundLocked: false,
   roundResult: null,
   turnPhase: "setup",
-  turnOwner: "host"
+  turnOwner: "host",
+  turnCounter: 0,
+  eliminatedTurn: new Map()
 };
 
 const CONFETTI_COLORS = ["#7c9cff", "#8d7dff", "#30d09b", "#ffcc66", "#ff7183", "#ffffff"];
@@ -80,6 +82,8 @@ function resetLocalStateForBoard() {
   state.roundResult = null;
   state.turnPhase = "setup";
   state.turnOwner = "host";
+  state.turnCounter = 0;
+  state.eliminatedTurn = new Map();
 }
 
 function clearConfetti() {
@@ -517,20 +521,28 @@ function toggleSecret(index) {
 function toggleLocalTile(index) {
   if (!state.board.length || index < 0 || index >= state.board.length || !areBoardActionsEnabled()) { return; }
 
-  const eliminated = !state.yourEliminated.has(index);
-  if (eliminated) {
-    state.yourEliminated.add(index);
-  } else {
+  const currentlyEliminated = state.yourEliminated.has(index);
+  
+  if (currentlyEliminated) {
+    const eliminatedTurn = state.eliminatedTurn.get(index);
+    if (eliminatedTurn !== state.turnCounter) {
+      setStatus("Cannot un-eliminate characters from previous turns.", "error");
+      return;
+    }
     state.yourEliminated.delete(index);
+    state.eliminatedTurn.delete(index);
+  } else {
+    state.yourEliminated.add(index);
+    state.eliminatedTurn.set(index, state.turnCounter);
   }
 
-  state.history.push({ index: index, eliminated: eliminated });
+  state.history.push({ index: index, eliminated: !currentlyEliminated, turnOwner: state.turnOwner });
   state.yourRemaining = getRemainingCount(state.yourEliminated);
   renderCounts();
   renderBoards();
 
   if (isChannelOpen()) {
-    sendTileToggle(index, eliminated);
+    sendTileToggle(index, !currentlyEliminated);
     sendCountUpdate();
   }
 }
@@ -579,9 +591,16 @@ function undoLastMove() {
   if (!lastMove) { return; }
 
   if (lastMove.eliminated) {
+    if (lastMove.turnOwner !== state.turnOwner) {
+      setStatus("Cannot undo eliminations from previous turns.", "error");
+      state.history.push(lastMove);
+      return;
+    }
     state.yourEliminated.delete(lastMove.index);
+    state.eliminatedTurn.delete(lastMove.index);
   } else {
     state.yourEliminated.add(lastMove.index);
+    state.eliminatedTurn.set(lastMove.index, state.turnCounter);
   }
 
   state.yourRemaining = getRemainingCount(state.yourEliminated);
@@ -589,7 +608,7 @@ function undoLastMove() {
   renderBoards();
 
   if (isChannelOpen()) {
-    sendTileToggle(lastMove.index, !lastMove.eliminated);
+    sendTileToggle(lastMove.index, lastMove.eliminated);
     sendCountUpdate();
   }
 
@@ -619,6 +638,9 @@ function handleResetRequest() {
 
   const seed = createSeed();
   startFreshRound(seed, "local");
+  if (state.isHost) {
+    dom.startGameSection.hidden = false;
+  }
   if (isChannelOpen()) {
     sendReset(seed);
     sendSync();
@@ -641,6 +663,7 @@ function passQuestionControl() {
 
     state.turnPhase = "play";
     state.turnOwner = "host";
+    state.turnCounter = 1;
     renderBoards();
     sendTurnUpdate();
     setStatus("Both secrets are selected. The question round begins with the host asking first.");
@@ -650,6 +673,7 @@ function passQuestionControl() {
   if (getTurnRole() !== "question") { return; }
 
   state.turnOwner = state.turnOwner === "host" ? "joiner" : "host";
+  state.turnCounter++;
   renderBoards();
   sendTurnUpdate();
   setStatus("Question control passed to the other player.");
@@ -715,6 +739,8 @@ function handleRemoteMessage(event) {
   switch (message.type) {
     case MESSAGE_TYPES.MODE_INIT:
       initializeBoard(message.mode, message.shuffleSeed);
+      dom.modeSelect.value = message.mode;
+      dom.modeSelect.disabled = true;
       setStatus("Connected round ready. " + getModeById(message.mode).label + " board loaded.");
       if (isChannelOpen()) { sendSync(); }
       break;
@@ -810,6 +836,10 @@ function attachDataChannel(channel) {
     collapseConnectionPanel();
     renderBoards();
     setStatus("Peer connection open. Board updates will sync live.");
+    if (state.isHost) {
+      dom.modeSelect.disabled = false;
+      dom.startGameSection.hidden = false;
+    }
     if (state.isHost && state.board.length) {
       sendModeInit();
       sendSync();
@@ -820,12 +850,16 @@ function attachDataChannel(channel) {
 
   channel.onclose = function() {
     updateConnectionStatus("disconnected", "Disconnected");
+    dom.modeSelect.disabled = false;
+    dom.startGameSection.hidden = true;
     renderBoards();
     setStatus("Data channel closed. Reconnect by exchanging a new offer/answer.", "error");
   };
 
   channel.onerror = function() {
     updateConnectionStatus("error", "Connection error");
+    dom.modeSelect.disabled = false;
+    dom.startGameSection.hidden = true;
     renderBoards();
     setStatus("A data channel error occurred.", "error");
   };
@@ -905,8 +939,6 @@ function waitForIceGatheringComplete(peerConnection, timeoutMs) {
 async function createOfferFlow() {
   try {
     state.isHost = true;
-    state.modeId = dom.modeSelect.value;
-    initializeBoard(state.modeId, createSeed());
     updateConnectionStatus("connecting", "Creating offer");
     setStatus("Creating peer offer...");
 
@@ -917,18 +949,38 @@ async function createOfferFlow() {
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
     updateLocalSignalOutput(peerConnection);
-    setStatus("Offer ready. Copy and send it to the other player.");
+    
+    const copied = await autoCopyToClipboard(dom.localSignalOutput.value);
+    setStatus(copied ? "Offer copied! Send it to the other player." : "Offer ready. Copy and send it to the other player.");
 
     Promise.race([
       waitForIceGatheringComplete(peerConnection),
       new Promise(r => setTimeout(r, 5000))
     ]).then(function() {
       updateLocalSignalOutput(peerConnection);
+      autoCopyToClipboard(dom.localSignalOutput.value);
     });
   } catch (error) {
     console.error("createOfferFlow error:", error);
     updateConnectionStatus("error", "Offer failed");
     setStatus("Failed to create offer: " + error.message, "error");
+  }
+}
+
+function startGame() {
+  if (!state.isHost) { return; }
+  if (!dom.modeSelect.value) {
+    setStatus("Please select a game mode first.", "error");
+    return;
+  }
+  
+  state.modeId = dom.modeSelect.value;
+  initializeBoard(state.modeId, createSeed());
+  setStatus("Game started with " + getModeById(state.modeId).label + ". Choose your secret first.");
+  
+  if (isChannelOpen()) {
+    sendModeInit();
+    sendSync();
   }
 }
 
@@ -956,14 +1008,17 @@ async function createAnswerFlow() {
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
     updateLocalSignalOutput(peerConnection);
-    setStatus("Answer created. Signal text is ready and may keep updating for a few seconds while network candidates are added.");
+    
+    const copied = await autoCopyToClipboard(dom.localSignalOutput.value);
+    setStatus(copied ? "Answer copied! Send it back to the host." : "Answer created. Copy and send it back to the host.");
 
     Promise.race([
       waitForIceGatheringComplete(peerConnection),
       new Promise(r => setTimeout(r, 5000))
     ]).then(function() {
       updateLocalSignalOutput(peerConnection);
-      setStatus("Answer ready. Send it back to the host. The board will load when the host finishes connecting.");
+      autoCopyToClipboard(dom.localSignalOutput.value);
+      setStatus("Answer ready. Send it back to the host.");
     });
   } catch (error) {
     console.error(error);
@@ -1018,6 +1073,17 @@ async function copyLocalSignal() {
   }
 }
 
+async function autoCopyToClipboard(text) {
+  if (!text) return false;
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (error) {
+    console.warn("Auto-copy failed:", error);
+    return false;
+  }
+}
+
 async function sendToWhatsApp(isLocal) {
   const text = isLocal ? dom.localSignalOutput.value.trim() : dom.remoteSignalInput.value.trim();
   if (!text) {
@@ -1047,15 +1113,16 @@ async function pasteRemoteSignal() {
 
 function handleModeSelection(event) {
   state.modeId = event.target.value;
-  if (state.board.length || isChannelOpen()) { return; }
-  initializeBoard(state.modeId, createSeed());
 }
 
 function bootstrap() {
   try {
     populateModeSelect("modeSelect");
-    state.yourRemaining = getCharacterCountForMode(state.modeId);
-    state.opponentRemaining = getCharacterCountForMode(state.modeId);
+    state.yourRemaining = 25;
+    state.opponentRemaining = 25;
+    if (dom.startGameSection) {
+      dom.startGameSection.hidden = true;
+    }
     renderCounts();
     renderBoards();
     renderBoardInfo();
@@ -1076,6 +1143,9 @@ function bootstrap() {
     dom.modeSelect.addEventListener("change", handleModeSelection);
     dom.connectionPanelToggle.addEventListener("click", toggleConnectionPanel);
     dom.newGameBtn.addEventListener("click", handleNewGameRequest);
+    if (dom.startGameBtn) {
+      dom.startGameBtn.addEventListener("click", startGame);
+    }
   } catch (error) {
     console.error("Bootstrap error:", error);
     setStatus("Error during initialization.", "error");
