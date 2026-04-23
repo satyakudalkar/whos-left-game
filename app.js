@@ -19,7 +19,9 @@ const state = {
   turnPhase: "setup",
   turnOwner: "host",
   turnCounter: 0,
-  eliminatedTurn: new Map()
+  eliminatedTurn: new Map(),
+  mySlotShuffle: [],
+  opponentSlotShuffle: []
 };
 
 const CONFETTI_COLORS = ["#7c9cff", "#8d7dff", "#30d09b", "#ffcc66", "#ff7183", "#ffffff"];
@@ -157,6 +159,9 @@ function initializeBoard(modeId, seed) {
     };
   });
 
+  state.mySlotShuffle = seededShuffle([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24], seed + "hostslot");
+  state.opponentSlotShuffle = seededShuffle([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24], seed + "joinerslot");
+
   resetLocalStateForBoard();
   renderCounts();
   renderBoards();
@@ -252,7 +257,7 @@ function renderYourBoard() {
   }
 
   if (state.turnPhase === "setup" && getTurnRole() === "wait") {
-    dom.yourBoardContainer.innerHTML = '<div class="empty-state turn-blocked-state"><strong>Waiting for the other player to choose a secret.</strong><span>Your setup turn will come next. Once both secrets are selected, the question round will begin automatically.</span></div>';
+    dom.yourBoardContainer.innerHTML = '<div class="empty-state turn-blocked-state"><strong>Waiting for the other player to choose a secret.</strong><span>Your setup turn will come next. Once both secrets are selected, the normal question and answer flow begins.</span></div>';
     return;
   }
 
@@ -266,33 +271,36 @@ function renderYourBoard() {
   const boardActionsEnabled = areBoardActionsEnabled();
   const canGuess = isChannelOpen() && boardActionsEnabled;
 
-  state.board.forEach(function(character, index) {
+  for (let displayIndex = 0; displayIndex < 25; displayIndex++) {
+    const actualIndex = state.mySlotShuffle[displayIndex];
+    const character = state.board[actualIndex];
+    
     const card = document.createElement("button");
     card.type = "button";
     card.className = "character-card";
-    if (state.yourEliminated.has(index)) {
+    if (state.yourEliminated.has(actualIndex)) {
       card.classList.add("is-eliminated");
     }
-    card.setAttribute("aria-pressed", String(state.yourEliminated.has(index)));
+    card.setAttribute("aria-pressed", String(state.yourEliminated.has(actualIndex)));
 
     const topline = document.createElement("div");
     topline.className = "tile-topline";
 
     const tileIndex = document.createElement("span");
     tileIndex.className = "tile-index";
-    tileIndex.textContent = "Slot " + (index + 1);
+    tileIndex.textContent = "Slot " + (displayIndex + 1);
 
     const secretToggle = document.createElement("button");
     secretToggle.type = "button";
     secretToggle.className = "secret-toggle";
-    secretToggle.textContent = state.secretIndex === index ? "Secret" : "Mark Secret";
-    if (state.secretIndex === index) {
+    secretToggle.textContent = state.secretIndex === actualIndex ? "Secret" : "Mark Secret";
+    if (state.secretIndex === actualIndex) {
       secretToggle.classList.add("active");
     }
     secretToggle.disabled = !canChooseSecret();
     secretToggle.addEventListener("click", function(event) {
       event.stopPropagation();
-      toggleSecret(index);
+      toggleSecret(actualIndex);
     });
 
     topline.appendChild(tileIndex);
@@ -307,7 +315,7 @@ function renderYourBoard() {
 
     const subtext = document.createElement("div");
     subtext.className = "card-subtext";
-    subtext.textContent = state.yourEliminated.has(index) ? "Eliminated from your board" : "Active on your board";
+    subtext.textContent = state.yourEliminated.has(actualIndex) ? "Eliminated from your board" : "Active on your board";
 
     meta.appendChild(name);
     meta.appendChild(subtext);
@@ -325,22 +333,22 @@ function renderYourBoard() {
     guessButton.disabled = !canGuess;
     guessButton.addEventListener("click", function(event) {
       event.stopPropagation();
-      makeGuess(index);
+      makeGuess(actualIndex);
     });
 
     actions.appendChild(guessButton);
     card.appendChild(actions);
 
-    if (state.secretIndex === index) {
+    if (state.secretIndex === actualIndex) {
       const badge = document.createElement("div");
       badge.className = "secret-badge";
       badge.textContent = "Your Secret";
       card.appendChild(badge);
     }
 
-    card.addEventListener("click", function() { toggleLocalTile(index); });
+    card.addEventListener("click", function() { toggleLocalTile(actualIndex); });
     grid.appendChild(card);
-  });
+  }
 
   dom.yourBoardContainer.innerHTML = "";
   dom.yourBoardContainer.appendChild(grid);
@@ -400,16 +408,17 @@ function renderOpponentBoard() {
   const grid = document.createElement("div");
   grid.className = "mini-grid";
 
-  state.board.forEach(function(_, index) {
+  for (let displayIndex = 0; displayIndex < 25; displayIndex++) {
+    const actualSlot = state.opponentSlotShuffle[displayIndex];
     const tile = document.createElement("div");
     tile.className = "mini-tile";
-    if (state.opponentEliminated.has(index)) {
+    if (state.opponentEliminated.has(actualSlot)) {
       tile.classList.add("is-eliminated");
     }
 
     const idx = document.createElement("span");
     idx.className = "mini-index";
-    idx.textContent = String(index + 1);
+    idx.textContent = String(displayIndex + 1);
 
     const front = document.createElement("div");
     front.className = "mini-face";
@@ -423,7 +432,7 @@ function renderOpponentBoard() {
     tile.appendChild(front);
     tile.appendChild(back);
     grid.appendChild(tile);
-  });
+  }
 
   dom.opponentBoardContainer.innerHTML = "";
   dom.opponentBoardContainer.appendChild(grid);
@@ -477,7 +486,8 @@ function sendSync() {
     remaining: state.yourRemaining,
     eliminated: Array.from(state.yourEliminated).sort(function(a, b) { return a - b; }),
     turnPhase: state.turnPhase,
-    turnOwner: state.turnOwner
+    turnOwner: state.turnOwner,
+    slotShuffle: state.opponentSlotShuffle
   });
   setStatus("Resync snapshot sent.");
 }
@@ -488,7 +498,9 @@ function sendModeInit() {
   sendMessage({
     type: MESSAGE_TYPES.MODE_INIT,
     mode: state.modeId,
-    shuffleSeed: state.shuffleSeed
+    shuffleSeed: state.shuffleSeed,
+    mySlotShuffle: state.mySlotShuffle,
+    opponentSlotShuffle: state.opponentSlotShuffle
   });
 }
 
@@ -689,7 +701,10 @@ function validateRemoteMessage(message) {
   const count = getCharacterCountForMode(state.modeId);
 
   if (message.type === MESSAGE_TYPES.MODE_INIT || message.type === MESSAGE_TYPES.RESET) {
-    return typeof message.mode === "string" && Boolean(getModeById(message.mode)) && typeof message.shuffleSeed === "string";
+    const baseValid = typeof message.mode === "string" && Boolean(getModeById(message.mode)) && typeof message.shuffleSeed === "string";
+    const mySlotValid = !message.mySlotShuffle || (Array.isArray(message.mySlotShuffle) && message.mySlotShuffle.length === 25);
+    const oppSlotValid = !message.opponentSlotShuffle || (Array.isArray(message.opponentSlotShuffle) && message.opponentSlotShuffle.length === 25);
+    return baseValid && mySlotValid && oppSlotValid;
   }
 
   if (message.type === MESSAGE_TYPES.TURN_UPDATE) {
@@ -705,13 +720,15 @@ function validateRemoteMessage(message) {
   }
 
   if (message.type === MESSAGE_TYPES.SYNC) {
-    return Number.isInteger(message.remaining)
+    const baseValid = Number.isInteger(message.remaining)
       && message.remaining >= 0
       && message.remaining <= count
       && Array.isArray(message.eliminated)
       && message.eliminated.every(function(idx) { return Number.isInteger(idx) && idx >= 0 && idx < count; })
       && (message.turnPhase === "setup" || message.turnPhase === "play")
       && (message.turnOwner === "host" || message.turnOwner === "joiner");
+    const slotValid = !message.slotShuffle || (Array.isArray(message.slotShuffle) && message.slotShuffle.length === 25);
+    return baseValid && slotValid;
   }
 
   if (message.type === MESSAGE_TYPES.GUESS_REQUEST) {
@@ -742,6 +759,12 @@ function handleRemoteMessage(event) {
   switch (message.type) {
     case MESSAGE_TYPES.MODE_INIT:
       initializeBoard(message.mode, message.shuffleSeed);
+      if (message.opponentSlotShuffle) {
+        state.mySlotShuffle = message.opponentSlotShuffle;
+      }
+      if (message.mySlotShuffle) {
+        state.opponentSlotShuffle = message.mySlotShuffle;
+      }
       dom.modeSelect.value = message.mode;
       dom.modeSelect.disabled = true;
       setStatus("Connected round ready. " + getModeById(message.mode).label + " board loaded.");
@@ -765,6 +788,9 @@ function handleRemoteMessage(event) {
       state.opponentEliminated = new Set(message.eliminated);
       state.turnPhase = message.turnPhase;
       state.turnOwner = message.turnOwner;
+      if (message.slotShuffle) {
+        state.mySlotShuffle = message.slotShuffle;
+      }
       applyOpponentCount(message.remaining);
       renderBoards();
       setStatus("Remote board resynced.");
