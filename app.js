@@ -21,7 +21,10 @@ const state = {
   turnCounter: 0,
   eliminatedTurn: new Map(),
   mySlotShuffle: [],
-  opponentSlotShuffle: []
+  opponentSlotShuffle: [],
+  heartbeatIntervalId: null,
+  lastPongReceived: 0,
+  wasConnected: false
 };
 
 const CONFETTI_COLORS = ["#7c9cff", "#8d7dff", "#30d09b", "#ffcc66", "#ff7183", "#ffffff"];
@@ -524,6 +527,21 @@ function sendGuessResult(index, correct) {
   sendMessage({ type: MESSAGE_TYPES.GUESS_RESULT, index: index, correct: correct });
 }
 
+function startHeartbeat() {
+  stopHeartbeat();
+  state.lastPongReceived = Date.now();
+  state.heartbeatIntervalId = setInterval(function() {
+    sendMessage({ type: MESSAGE_TYPES.PING, timestamp: Date.now() });
+  }, 5000);
+}
+
+function stopHeartbeat() {
+  if (state.heartbeatIntervalId) {
+    clearInterval(state.heartbeatIntervalId);
+    state.heartbeatIntervalId = null;
+  }
+}
+
 function toggleSecret(index) {
   if (!canChooseSecret()) { return; }
   state.secretIndex = state.secretIndex === index ? null : index;
@@ -739,6 +757,10 @@ function validateRemoteMessage(message) {
     return Number.isInteger(message.index) && message.index >= 0 && message.index < count && typeof message.correct === "boolean";
   }
 
+  if (message.type === MESSAGE_TYPES.PING || message.type === MESSAGE_TYPES.PONG || message.type === MESSAGE_TYPES.SYNC_REQUEST) {
+    return typeof message.timestamp === "number" && message.timestamp > 0;
+  }
+
   return true;
 }
 
@@ -824,6 +846,21 @@ function handleRemoteMessage(event) {
       return;
     }
 
+    case MESSAGE_TYPES.PING:
+      sendMessage({ type: MESSAGE_TYPES.PONG, timestamp: message.timestamp });
+      return;
+
+    case MESSAGE_TYPES.PONG:
+      state.lastPongReceived = Date.now();
+      return;
+
+    case MESSAGE_TYPES.SYNC_REQUEST:
+      if (state.board.length && isChannelOpen()) {
+        sendSync();
+        setStatus("Re-sync sent to opponent.");
+      }
+      return;
+
     case MESSAGE_TYPES.GUESS_RESULT: {
       const guessedCharacter = state.board[message.index];
       if (message.correct) {
@@ -866,6 +903,8 @@ function attachDataChannel(channel) {
     collapseConnectionPanel();
     renderBoards();
     setStatus("Peer connection open. Board updates will sync live.");
+    startHeartbeat();
+    state.wasConnected = true;
     if (state.isHost) {
       dom.modeSelect.disabled = false;
       dom.startGameSection.hidden = false;
@@ -883,6 +922,7 @@ function attachDataChannel(channel) {
 
 channel.onclose = function() {
     updateConnectionStatus("disconnected", "Disconnected");
+    stopHeartbeat();
     dom.modeSelect.disabled = false;
     dom.startGameSection.hidden = true;
     document.body.classList.remove('joiner');
@@ -895,14 +935,6 @@ channel.onclose = function() {
     dom.modeSelect.disabled = false;
     dom.startGameSection.hidden = true;
     document.body.classList.remove('joiner');
-    renderBoards();
-    setStatus("A data channel error occurred.", "error");
-  };
-
-  channel.onerror = function() {
-    updateConnectionStatus("error", "Connection error");
-    dom.modeSelect.disabled = false;
-    dom.startGameSection.hidden = true;
     renderBoards();
     setStatus("A data channel error occurred.", "error");
   };
@@ -1211,6 +1243,14 @@ function bootstrap() {
     dom.connectionPanelToggle.addEventListener("click", toggleConnectionPanel);
     dom.newGameBtn.addEventListener("click", handleNewGameRequest);
     dom.themeToggle.addEventListener("click", toggleTheme);
+    document.addEventListener("visibilitychange", function() {
+      if (document.visibilityState === "visible") {
+        if (state.wasConnected && !isChannelOpen() && state.board.length) {
+          setStatus("Reconnecting... re-syncing board with opponent.", "info");
+          sendMessage({ type: MESSAGE_TYPES.SYNC_REQUEST, timestamp: Date.now() });
+        }
+      }
+    });
     if (dom.startGameBtn) {
       dom.startGameBtn.addEventListener("click", startGame);
     }

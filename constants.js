@@ -6,7 +6,10 @@ const MESSAGE_TYPES = {
   RESET: "reset",
   TURN_UPDATE: "turn_update",
   GUESS_REQUEST: "guess_request",
-  GUESS_RESULT: "guess_result"
+  GUESS_RESULT: "guess_result",
+  PING: "ping",
+  PONG: "pong",
+  SYNC_REQUEST: "sync_request"
 };
 
 const dom = {
